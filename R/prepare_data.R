@@ -14,7 +14,7 @@ require(lubridate)
 data_dir <- "data/"
 hurdat_file <- paste0(data_dir,"data_hurdat.csv")
 rainfall_file <- paste0(data_dir,"data_rainfall.csv")
-surgedat_file <- paste0(data_dir,"data_surge.csv")
+surge_file <- paste0(data_dir,"data_surge.csv")
 update <- FALSE
 
 #### Get the Hurdat2 data:
@@ -97,7 +97,7 @@ if (file.exists(hurdat_file) & !update) {
 
 # first check if the file already exists:
 if (file.exists(rainfall_file) & !update) {
-        rainfall_data <- read.csv(rainfall_data)
+        rainfall_data <- read.csv(rainfall_file)
 } else {
 
   # read the html direct from the noaa website
@@ -127,7 +127,7 @@ if (file.exists(rainfall_file) & !update) {
     n_amounts <- length(amounts)
     locations <- stringr::str_split_fixed(row$Location, "[\n]", n_amounts)[1,]
     
-    row_df <- data.frame(name = h_name,
+    row_df <- data.frame(name = str_to_upper(h_name),
                          month = h_month,
                          year = h_year,
                          amount = as.numeric(amounts),
@@ -137,58 +137,50 @@ if (file.exists(rainfall_file) & !update) {
   
   
   # get rid of unnamed storms and nas
-  rainfall_data <- filter(point_maxima, name != "unnamed")
+  rainfall_data <- filter(point_maxima, name != "UNNAMED")
   rainfall_data <- na.omit(rainfall_data)
   write.csv(rainfall_data, file = rainfall_file)
 }
 
 
-#### Surgedat ####
 
-if (file.exists(surge_file & !update)) {
+################################
+#                              #
+#           Surgedat           #
+#                              #
+################################
+
+if (file.exists(surge_file) & !update) {
         surge_data <- surge_file
 } else {
-
   surge_data <- read.csv("http://surge.climate.lsu.edu/files/gompeaksurgedb.csv")
-  csv.write(surge_data,file=surge_file)
-
-} 
+}
 
 
+################################
+#                              #
+#      Clean and Join Data     #
+#                              #
+################################
 
-
-#
-#     join the datasets
-#
-#
-
-# add a unique row index based on name and year:
-point_maxima <- point_maxima %>% 
+# group to one line per storm (by name/year)
+# convert rainfall from in to mm
+rainfall_data %>% 
   group_by(name, year) %>% 
-  mutate(lf_idx = row_number())
+  summarise(amount = max(amount,na.rm=TRUE)) %>%
+  mutate(rainfall_mm = amount * 25.4) %>%
+  select(name,year,rainfall_mm)
 
-# and same index to hurdat 
-h_data <- read.csv("data/AllData.csv", stringsAsFactors = FALSE)
-h_data$X <- NULL
-cols_out <- names(h_data)
-
-h_data <- h_data %>% 
-  mutate(datetime = ymd(Time),
-         name_lower = str_to_lower(Name)) %>% 
-  mutate(year = year(datetime)) %>% 
-  arrange(name_lower) %>% 
-  group_by(name_lower) %>% 
-  mutate(lf_idx = row_number()) %>%
-  ungroup()
+# group to one line per storm
+# compute radius 
+# keep only name, year, pressure, windspeed, radius columns
+h_data <- hurdat_data %>% head
+  mutate(name = str_to_upper(h_name)) %>% 
+  mutate(year = year(date))
 
 joined <- left_join(h_data, select(point_maxima, name, year, lf_idx, amount, location),
                     by = c("name_lower" = "name", "year" = "year", "lf_idx" = "lf_idx")) %>% 
   arrange(datetime, lf_idx)
-
-joined$point_max_mm <- joined$amount * 25.4
-joined$Rainfall <- ifelse(is.na(joined$Rainfall) & !is.na(joined$point_max_mm), 
-                          joined$point_max_mm,
-                          joined$Rainfall)
 
 joined <- select(joined, cols_out)
 
