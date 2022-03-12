@@ -151,10 +151,37 @@ if (file.exists(rainfall_file) & !update) {
 ################################
 
 if (file.exists(surge_file) & !update) {
-        surge_data <- surge_file
+        surge_data <- read.csv(surge_file)
 } else {
   surge_data <- read.csv("http://surge.climate.lsu.edu/files/gompeaksurgedb.csv")
+  write.csv(surge_data, file=surge_file)
 }
+
+
+####################################
+#                                  #
+#           Tornado Data           #
+#                                  #
+####################################
+if (file.exists(tornado_file) & !update) {
+        tornado_data <- read.csv(tornado_file)
+} else {
+ 
+  # get the tornado data from sheet 3 of the online .xls file
+  # there are some superfluous rows to get rid of also
+  tornado_data <- rio::import("https://www.spc.noaa.gov/misc/edwards/TCTOR/tctor.xls",which=2)
+  tornado_data <- na.omit(tornado_data) # get rid of empty rows
+  tornado_data <- unique(tornado_data)  # get rid of dupes
+  tornado_data <- tornado_data[ str_detect(str_to_lower(tornado_data[,1]), "total", negate=TRUE), ] # get rid of 'total' rows
+  # clean up the name and year columns
+  tornado_data$name <- str_to_upper(str_split_fixed(tornado_data[,1],"-",2)[,1])
+  tornado_data$yy <- str_split_fixed(tornado_data[,1],"-",2)[,2]
+  tornado_data$year <- ifelse(as.numeric(tornado_data$yy) <= 22, paste0("20", tornado_data$yy), paste0("19", tornado_data$yy))
+  tornado_data <- select(tornado_data, year, name, Tors)
+
+}
+
+
 
 
 ################################
@@ -174,13 +201,21 @@ rainfall_data %>%
 # group to one line per storm
 # compute radius 
 # keep only name, year, pressure, windspeed, radius columns
-h_data <- hurdat_data %>% head
-  mutate(name = str_to_upper(h_name)) %>% 
+wind_50_cols = which(str_starts(names(hurdat_data), "wind_50_"))
+hurdat_data$radius_50kt = apply(hurdat_data[,wind_50_cols],1,max)
+
+h_data <- hurdat_data %>%
+  mutate(name = str_to_upper(h_name)) %>%
   mutate(year = year(date))
+
+h_data <- h_data %>% 
+  group_by(name, year) %>%
+  summarise(pressure = min(pressure_min, na.rm=TRUE),
+            windspeed = max(windspeed_max, na.rm = TRUE),
+            radius = max(radius_50kt, na.rm=TRUE))
 
 joined <- left_join(h_data, select(point_maxima, name, year, lf_idx, amount, location),
                     by = c("name_lower" = "name", "year" = "year", "lf_idx" = "lf_idx")) %>% 
   arrange(datetime, lf_idx)
 
 joined <- select(joined, cols_out)
-
