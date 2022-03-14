@@ -166,7 +166,6 @@ if (file.exists(surge_file) & !update) {
 if (file.exists(tornado_file) & !update) {
         tornado_data <- read.csv(tornado_file)
 } else {
- 
   # get the tornado data from sheet 3 of the online .xls file
   # there are some superfluous rows to get rid of also
   tornado_data <- rio::import("https://www.spc.noaa.gov/misc/edwards/TCTOR/tctor.xls",which=2)
