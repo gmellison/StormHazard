@@ -14,13 +14,14 @@ require(lubridate)
 data_dir <- "data/"
 hurdat_file <- paste0(data_dir,"data_hurdat.csv")
 rainfall_file <- paste0(data_dir,"data_rainfall.csv")
+tornado_file <- paste0(data_dir,"data_tornado.csv")
 surge_file <- paste0(data_dir,"data_surge.csv")
-update <- FALSE
+recook <- FALSE
 
 #### Get the Hurdat2 data:
 ### data schema
 
-if (file.exists(hurdat_file) & !update) {
+if (file.exists(hurdat_file) & !recook) {
         hurdat_data <- read.csv(hurdat_file)
 } else {
   schema <- c(
@@ -96,7 +97,7 @@ if (file.exists(hurdat_file) & !update) {
 ##############################################
 
 # first check if the file already exists:
-if (file.exists(rainfall_file) & !update) {
+if (file.exists(rainfall_file) & !recook) {
         rainfall_data <- read.csv(rainfall_file)
 } else {
 
@@ -150,11 +151,21 @@ if (file.exists(rainfall_file) & !update) {
 #                              #
 ################################
 
-if (file.exists(surge_file) & !update) {
+if (file.exists(surge_file) & !recook) {
         surge_data <- read.csv(surge_file)
 } else {
-  surge_data <- read.csv("http://surge.climate.lsu.edu/files/gompeaksurgedb.csv")
-  write.csv(surge_data, file=surge_file)
+        # online surge database doesn't contain full dataset. 
+        # try to get it from paper pdf instead
+        # surge_data <- read.csv("http://surge.climate.lsu.edu/files/gompeaksurgedb.csv")
+        # read the tables from the 
+        surge_tables <- tabulizer::extract_tables("data/Needham_Keim_IJOC_2012.pdf")
+        surge_df_list <- lapply(surge_tables[3:7], function(tab) {
+                       df <- data.frame(tab[-1,])
+                       names(df) <- c("rank","surge_m","name","year","location","state","lat","lon","conf")
+                       return(df)
+        })
+        surge_data <- bind_rows(surge_df_list)
+        write.csv(surge_data, file=surge_file)
 }
 
 
@@ -163,7 +174,7 @@ if (file.exists(surge_file) & !update) {
 #           Tornado Data           #
 #                                  #
 ####################################
-if (file.exists(tornado_file) & !update) {
+if (file.exists(tornado_file) & !recook) {
         tornado_data <- read.csv(tornado_file)
 } else {
   # get the tornado data from sheet 3 of the online .xls file
@@ -189,14 +200,17 @@ if (file.exists(tornado_file) & !update) {
 #                              #
 ################################
 
+
+## Clean Rainfall
 # group to one line per storm (by name/year)
 # convert rainfall from in to mm
-rainfall_data %>% 
+r_data <- rainfall_data %>% 
   group_by(name, year) %>% 
   summarise(amount = max(amount,na.rm=TRUE)) %>%
   mutate(rainfall_mm = amount * 25.4) %>%
   select(name,year,rainfall_mm)
 
+## Clean Hurdat
 # group to one line per storm
 # compute radius 
 # keep only name, year, pressure, windspeed, radius columns
@@ -205,16 +219,31 @@ hurdat_data$radius_50kt = apply(hurdat_data[,wind_50_cols],1,max)
 
 h_data <- hurdat_data %>%
   mutate(name = str_to_upper(h_name)) %>%
-  mutate(year = year(date))
-
-h_data <- h_data %>% 
+  mutate(year = year(date)) %>%
   group_by(name, year) %>%
   summarise(pressure = min(pressure_min, na.rm=TRUE),
             windspeed = max(windspeed_max, na.rm = TRUE),
             radius = max(radius_50kt, na.rm=TRUE))
 
-joined <- left_join(h_data, select(point_maxima, name, year, lf_idx, amount, location),
-                    by = c("name_lower" = "name", "year" = "year", "lf_idx" = "lf_idx")) %>% 
-  arrange(datetime, lf_idx)
+## Clean Surge
+# group to max surge per storm
+# keep only name, year, surge_m
+s_data <- surge_data %>% 
+        na.omit %>% 
+        select(year,name,surge_m)%>% 
+        group_by(name,year)%>% 
+        summarise(surge=max(surge_m, na.rm=TRUE))%>% 
+        mutate(year=as.numeric(year),
+               name=str_to_upper(name))
 
-joined <- select(joined, cols_out)
+## Clean Tornado
+# only need to make sure year is numeric 
+t_data <- tornado_data %>% 
+        mutate(year=as.numeric(year))
+
+joined <- h_data %>% 
+        left_join(r_data, by=c("name","year")) %>% 
+        left_join(s_data, by=c("name","year")) %>%
+        left_join(t_data, by=c("name","year"))
+
+write.csv(joined,file="data/StormHazards.csv")
