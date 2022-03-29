@@ -9,7 +9,7 @@ and for generating bar plots displaying the categories.
 The cleaned primary dataset is housed in the `data` directory. Note that 
 it is possible to use this dataset directly without recreating it by running `prepare_data.R`. 
 
-For details on the data 
+For details on the data sources and cleaning, see the README_data file  in the data subfolder.
 
 # How to Download the code and data: 
 
