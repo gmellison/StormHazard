@@ -18,7 +18,7 @@ Storm surge data from SURGEDAT - formerly maintained by SRCC at LSU:
 Link: SURGEDAT
 
 The SURGEDAT database contains storm name, year, and storm surge height (in both meters and feet). Most storms 
-contain only a single entry, but some contain multiple observations (e.g. Katrina, 2006). We keep 
+contain only a single entry, but some contain multiple observations (e.g. Katrina, 2005). We keep 
 only the maximum observed surge per storm. 
 
 The SURGEDAT database online seems to be incomplete, compared with the original SURGEDAT paper. We extract the 
