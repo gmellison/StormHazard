@@ -59,13 +59,21 @@ add_categories <- function(data, category_cutoffs="saffir-simpson") {
 }
 
 # function to generate the bar plot, based on a single row of the h dataframe.
-make_bar_plot <- function(data, name, year) {
+make_bar_plot <- function(data, storm_name, storm_year) {
   
   # rename things nicely
   h <- data %>% 
-          filter(name == str_to_upper(name)) %>%
+          filter(name == str_to_upper(storm_name) & year == storm_year) %>%
     select(c("name", "year", "RainCat", "WindCat", "SurgeCat", "PressureCat", "TornadoCat", "RadiusCat"))
-  
+ 
+  if (nrow(h)==0) stop(sprintf("0 rows returned, storm with name %s and year %s not found.", 
+                       storm_name, storm_year))
+  if (nrow(h) > 1) stop(sprintf(">1 rows returned for name: %s, year: %s; 
+                                something unexpected has happened. please contact the authors.
+                                ",
+                       storm_name, storm_year))
+
+
   # format data as key/value for easy bar plotting   
   plt_h <- pivot_longer(h, names_to = "Hazard", values_to = "Category",
                         cols = c("SurgeCat", "WindCat", "RainCat", "TornadoCat", "PressureCat", "RadiusCat")
