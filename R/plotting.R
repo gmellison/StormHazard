@@ -44,4 +44,6 @@ add_categories <- function(data, category_cutoffs="saffir-simpson") {
         data$TornadoCat  <- .bincode(data$Tornado_Z, c(-5,zscore_cuts,10))-1
         data$RadiusCat   <- .bincode(data$Radius_Z, c(-5,zscore_cuts,10))-1
 
+        return(data)
+
 }
