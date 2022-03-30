@@ -2,6 +2,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(knitr)
+library(stringr)
 
 add_categories <- function(data, category_cutoffs="saffir-simpson") {
 
@@ -12,13 +13,22 @@ add_categories <- function(data, category_cutoffs="saffir-simpson") {
    
         sscore_cuts <- c(65, 82, 95, 112, 136)
         
-        s <- sd(data$windwpeed,na.rm=TRUE)
+        s <- sd(data$windspeed,na.rm=TRUE)
         m <- mean(data$windspeed,na.rm=TRUE)
             
             # z-score categories base on saff-simp (windspeeds)
         zscore_cuts <- (sscore_cuts - m) / s
  
        # TODO: center/scale raw data columns
+        wind_z <- (data$windspeed - mean(data$windspeed, na.rm=TRUE))/ sd(data$windspeed, na.rm=TRUE)
+        rain_z <- (data$rainfall_mm - mean(data$rainfall_mm, na.rm=TRUE)) / sd(data$rainfall_mm, na.rm=TRUE)
+        surge_z <- (data$surge - mean(data$surge, na.rm=TRUE)) / sd(data$surge, na.rm=TRUE)
+        radius_z <- (data$radius - mean(data$radius, na.rm=TRUE)) / sd(data$radius, na.rm=TRUE)
+        pressure_z <- (data$pressure - mean(data$pressure, na.rm=TRUE)) / sd(data$pressure, na.rm=TRUE)
+        tornado_z <- (data$Tors - mean(data$Tors, na.rm=TRUE)) / sd(data$Tors, na.rm=TRUE)
+
+
+
 
         if (category_cutoffs=="averaged") {      
             # Surge: z-score category cuts based on surge "saff-simp" analogue
@@ -37,12 +47,12 @@ add_categories <- function(data, category_cutoffs="saffir-simpson") {
             zscore_cuts <- (1/3) * (p_zscore_cuts + s_zscore_cuts + zscore_cuts)
         }
 
-        data$WindCat     <- .bincode(MaxWindSpeed_Z, c(-5,zscore_cuts,10))-1
-        data$RainCat     <- .bincode(RainfallPointMax_Z, c(-5,zscore_cuts,10))-1
-        data$SurgeCat    <- .bincode(Surge_Z, c(-5,zscore_cuts,10))-1
-        data$PressureCat <- .bincode(-1 * Pressure_Z, c(-5,zscore_cuts,10))-1
-        data$TornadoCat  <- .bincode(Tornado_Z, c(-5,zscore_cuts,10))-1
-        data$RadiusCat   <- .bincode(Radius_Z, c(-5,zscore_cuts,10))-1
+        data$WindCat     <- .bincode(wind_z, c(-5,zscore_cuts,10))-1
+        data$RainCat     <- .bincode(rain_z, c(-5,zscore_cuts,10))-1
+        data$SurgeCat    <- .bincode(surge_z, c(-5,zscore_cuts,10))-1
+        data$PressureCat <- .bincode(-1 * pressure_z, c(-5,zscore_cuts,10))-1
+        data$TornadoCat  <- .bincode(tornado_z, c(-5,zscore_cuts,10))-1
+        data$RadiusCat   <- .bincode(radius_z, c(-5,zscore_cuts,10))-1
 
         return(data)
 
@@ -53,12 +63,12 @@ make_bar_plot <- function(data, name, year) {
   
   # rename things nicely
   h <- data %>% 
-          filter(name ==str_to_upper()) %>%
-    select(c("name", "year", "RainfallCat", "WindCat", "SurgeCat", "PressureCat", "TornadoCat", "RadiusCat"))
+          filter(name == str_to_upper(name)) %>%
+    select(c("name", "year", "RainCat", "WindCat", "SurgeCat", "PressureCat", "TornadoCat", "RadiusCat"))
   
   # format data as key/value for easy bar plotting   
   plt_h <- pivot_longer(h, names_to = "Hazard", values_to = "Category",
-                        cols = c("Surge", "Windspeed", "Rainfall", "Tornado", "Pressure", "Size")
+                        cols = c("SurgeCat", "WindCat", "RainCat", "TornadoCat", "PressureCat", "RadiusCat")
   )
  
   plt_h$Category[is.na(plt_h$Category)] <- 0
