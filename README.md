@@ -30,6 +30,8 @@ Then, update if necessary with
 
 The data and scripts will be downloaded in the new R project. 
 
+Then, update by using the GIT dropdown menu in R Studio, and selecting "pull branches".
+
 # How to use the categorization and  plotting functions:
 
-
+The `main.R` script has a small demonstration of how to use the code to generate a plot. 
