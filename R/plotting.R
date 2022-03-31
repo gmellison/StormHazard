@@ -19,15 +19,12 @@ add_categories <- function(data, category_cutoffs="saffir-simpson") {
             # z-score categories base on saff-simp (windspeeds)
         zscore_cuts <- (sscore_cuts - m) / s
  
-       # TODO: center/scale raw data columns
         wind_z <- (data$windspeed - mean(data$windspeed, na.rm=TRUE))/ sd(data$windspeed, na.rm=TRUE)
         rain_z <- (data$rainfall_mm - mean(data$rainfall_mm, na.rm=TRUE)) / sd(data$rainfall_mm, na.rm=TRUE)
         surge_z <- (data$surge - mean(data$surge, na.rm=TRUE)) / sd(data$surge, na.rm=TRUE)
         radius_z <- (data$radius - mean(data$radius, na.rm=TRUE)) / sd(data$radius, na.rm=TRUE)
         pressure_z <- (data$pressure - mean(data$pressure, na.rm=TRUE)) / sd(data$pressure, na.rm=TRUE)
         tornado_z <- (data$Tors - mean(data$Tors, na.rm=TRUE)) / sd(data$Tors, na.rm=TRUE)
-
-
 
 
         if (category_cutoffs=="averaged") {      
