@@ -19,3 +19,6 @@ archive
 *.swp
 *.csv
 *.out
+*.nav
+*.toc
+*.snm
