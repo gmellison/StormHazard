@@ -16,7 +16,7 @@ hurdat_file <- paste0(data_dir,"data_hurdat.csv")
 rainfall_file <- paste0(data_dir,"data_rainfall.csv")
 tornado_file <- paste0(data_dir,"data_tornado.csv")
 surge_file <- paste0(data_dir,"data_surge.csv")
-recook <- FALSE
+recook <- TRUE 
 
 #### Get the Hurdat2 data:
 ### data schema
@@ -87,8 +87,40 @@ if (file.exists(hurdat_file) & !recook) {
   hurdat_data <- bind_rows(h_list)
   hurdat_data$date <- ymd(hurdat_data$date)
   hurdat_data <- filter(hurdat_data,year(date) >= 1980)
-  write.csv(file=hurdat_file, hurdat_data)
 }
+
+
+## Clean Hurdat
+# group to one line per storm
+# compute radius 
+# keep only name, year, pressure, windspeed, radius columns
+wind_50_cols = which(str_starts(names(hurdat_data), "wind_50_"))
+hurdat_data$radius_50kt = apply(hurdat_data[,wind_50_cols],1,max)
+
+lat_ns <- stringr::str_extract(hurdat_data$lat, "[NSEW]")
+lon_ew <- stringr::str_extract(hurdat_data$lon, "[NSEW]")
+
+hurdat_data$lat <- as.numeric(stringr::str_extract(hurdat_data$lat, "[0-9.]*"))
+hurdat_data$lon <- as.numeric(stringr::str_extract(hurdat_data$lon, "[0-9.]*"))
+
+hurdat_data$lat <- ifelse(lat_ns == "S", -1, 1) * hurdat_data$lat
+hurdat_data$lon <- ifelse(lon_ew == "W", -1, 1) * hurdat_data$lon
+
+h_data <- hurdat_data %>%
+  mutate(name = str_to_upper(h_name)) %>%
+  mutate(year = year(date)) %>%
+  mutate() %>% 
+  group_by(name, year) %>%
+  summarise(pressure = min(pressure_min, na.rm=TRUE),
+            windspeed = max(windspeed_max, na.rm = TRUE),
+            radius = max(radius_50kt, na.rm=TRUE),
+            lat_min=min(lat,na.rm=TRUE),lat_max=max(lat,na.rm=TRUE),
+            lon_min=min(lon,na.rm=TRUE),lon_max=max(lon,na.rm=TRUE),
+            date_min=min(date,na.rm=TRUE),date_max=max(date,na.rm=TRUE))
+
+
+write.csv(file=hurdat_file, h_data)
+
 
 ##############################################
 #                                            #
@@ -140,10 +172,20 @@ if (file.exists(rainfall_file) & !recook) {
   # get rid of unnamed storms and nas
   rainfall_data <- filter(point_maxima, name != "UNNAMED")
   rainfall_data <- na.omit(rainfall_data)
-  write.csv(rainfall_data, file = rainfall_file)
 }
 
 
+## Clean Rainfall
+# group to one line per storm (by name/year)
+# convert rainfall from in to mm
+r_data <- rainfall_data %>% 
+  group_by(name, year) %>% 
+  summarise(amount = max(amount,na.rm=TRUE)) %>%
+  mutate(rainfall_mm = amount * 25.4) %>%
+  select(name,year,rainfall_mm)
+
+
+write.csv(rainfall_data, file = r_file)
 
 ################################
 #                              #
@@ -167,6 +209,67 @@ if (file.exists(surge_file) & !recook) {
         surge_data <- bind_rows(surge_df_list)
         write.csv(surge_data, file=surge_file)
 }
+
+## Clean Surge
+# group to max surge per storm
+# keep only name, year, surge_m
+s_data <- surge_data %>% 
+        na.omit %>% 
+        select(year,name,surge_m)%>% 
+        group_by(name,year)%>% 
+        summarise(surge=max(surge_m, na.rm=TRUE))%>% 
+        mutate(year=as.numeric(year),
+               name=str_to_upper(name))
+
+
+# get surge reconstruction data from GSSR
+
+# pull metadata:
+surge_meta <- read.csv(
+  "https://raw.githubusercontent.com/moinabyssinia/gssr/gh-pages/metadata/allMetaDataRMSEReanalysis.csv"
+)
+
+# filter out everything outside range of hurdat data
+surge_meta <- surge_meta %>% 
+  filter(lat_x > min(h_data$lat_min) & lat_x < max(h_data$lat_max) & 
+         lon_x > min(h_data$lon_min) & lon_x < max(h_data$lon_max))
+
+s_join <- h_data %>% 
+        select(name,year,date_min,date_max,lat_min,lat_max,lon_min,lon_max)
+
+storm_surge_stations <- lapply(1:nrow(surge_meta), function(i) {
+
+  cat(sprintf("%s / %s \n", i, nrow(surge_meta)))
+
+  lat <- surge_meta$lat[i]
+  lon <- surge_meta$lon[i]
+
+  storms_covered <- lapply(1:nrow(s_join), function(j) {
+     if ( s_join$lat_min[j] < lat & s_join$lat_max[j] > lat & 
+          s_join$lon_min[j] < lon & s_join$lon_max[j] > lon ) {
+
+       data.frame(storm=s_join$name[j],
+                  year=s_join$year[j],
+                  start_time = s_join$date_min[j],
+                  end_time =  s_join$date_max[j],
+                  storm_lat_min = s_join$lat_min[j],
+                  storm_lat_max = s_join$lat_max[j],
+                  storm_lon_min = s_join$lon_min[j],
+                  storm_lon_max = s_join$lon_max[j]
+       )
+     }
+  }) %>% bind_rows
+
+  storms_covered$station <- surge_meta$tg[i]
+  storms_covered$station_lat <- surge_meta$lat_x[i]
+  storms_covered$station_lon <- surge_meta$lon_x[i]
+  storms_covered$best_reconstruction <- surge_meta$lowestRMSE[i]
+  storms_covered
+
+}) %>% bind_rows
+
+# now download and extract data from each station, based on storm starts and ends
+
 
 
 ####################################
@@ -192,50 +295,6 @@ if (file.exists(tornado_file) & !recook) {
 }
 
 
-
-
-################################
-#                              #
-#      Clean and Join Data     #
-#                              #
-################################
-
-
-## Clean Rainfall
-# group to one line per storm (by name/year)
-# convert rainfall from in to mm
-r_data <- rainfall_data %>% 
-  group_by(name, year) %>% 
-  summarise(amount = max(amount,na.rm=TRUE)) %>%
-  mutate(rainfall_mm = amount * 25.4) %>%
-  select(name,year,rainfall_mm)
-
-## Clean Hurdat
-# group to one line per storm
-# compute radius 
-# keep only name, year, pressure, windspeed, radius columns
-wind_50_cols = which(str_starts(names(hurdat_data), "wind_50_"))
-hurdat_data$radius_50kt = apply(hurdat_data[,wind_50_cols],1,max)
-
-h_data <- hurdat_data %>%
-  mutate(name = str_to_upper(h_name)) %>%
-  mutate(year = year(date)) %>%
-  group_by(name, year) %>%
-  summarise(pressure = min(pressure_min, na.rm=TRUE),
-            windspeed = max(windspeed_max, na.rm = TRUE),
-            radius = max(radius_50kt, na.rm=TRUE))
-
-## Clean Surge
-# group to max surge per storm
-# keep only name, year, surge_m
-s_data <- surge_data %>% 
-        na.omit %>% 
-        select(year,name,surge_m)%>% 
-        group_by(name,year)%>% 
-        summarise(surge=max(surge_m, na.rm=TRUE))%>% 
-        mutate(year=as.numeric(year),
-               name=str_to_upper(name))
-
 ## Clean Tornado
 # only need to make sure year is numeric 
 t_data <- tornado_data %>% 
@@ -246,4 +305,7 @@ joined <- h_data %>%
         left_join(s_data, by=c("name","year")) %>%
         left_join(t_data, by=c("name","year"))
 
+
+
+# write the final dataset
 write.csv(joined,file="data/StormHazards.csv")
