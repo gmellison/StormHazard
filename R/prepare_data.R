@@ -269,7 +269,47 @@ storm_surge_stations <- lapply(1:nrow(surge_meta), function(i) {
 }) %>% bind_rows
 
 # now download and extract data from each station, based on storm starts and ends
+storms_with_sccr_surge <- lapply(unique(storm_surge_stations$station), function(surge_station) {
+  station_df <- filter(storm_surge_stations, station == surge_station)
+  station_name <- stringr::str_replace(surge_station,".csv","")
+  best_recon <- unique(station_df$best_reconstruction)
+  best_recon_path <- ifelse(best_recon == "ERA-FIVE", "erafive", 
+                       ifelse(best_recon == "ERA-Interim", "eraint", 
+                          ifelse(best_recon == "MERRA", "merra",
+                            ifelse(best_recon == "20CR", "20cr", 
+                              ifelse(best_recon == "ERA-20c", "era20c", NA)))))
+  if (is.na(best_recon_path)) return(NULL)  
+  best_recon_7z_path <- sprintf("%s/%s.7z", best_recon_path, station_name)
+  recon_dl_path <- sprintf("https://github.com/moinabyssinia/gssr/raw/gh-pages/%s",best_recon_7z_path)
+  local_dl_path <- sprintf("./data/%s/%s_%s.7z",station_name,station_name,best_recon_path)
+  if (!dir.exists(sprintf("./data/%s/",station_name))) dir.create(sprintf("./data/%s/",station_name))
+  
+  # download the station best recon 7z file:
+  if (!file.exists(local_dl_path)) {
+    download.file(stringr::str_replace(recon_dl_path,",","%2C"),destfile=local_dl_path,method="wget")
+  }
 
+  # unzip, read, and keep only the max surge per storm
+  station_reconstruction <- read.csv(archive::archive_read(local_dl_path))
+
+  storm_rows <- lapply(unique(station_df$storm), function(storm_name) {
+                 storm_meta <- filter(station_df,storm==storm_name)
+                 station_recon_filtered <- filter(station_reconstruction, 
+                                           date > storm_meta$start_time[1] 
+                                           & date < storm_meta$end_time[1])
+                 max_surge_recon <- max(station_recon_filtered$surge_reconsturcted) 
+                 storm_meta$max_surge_reconstructed <- max_surge_recon
+                 storm_meta
+  }) %>% bind_rows
+  storm_rows
+
+}) %>% bind_rows
+
+storms_with_sccr_surge %>% filter(storm=="HARVEY"&year==2017) %>% '$'('station') 
+
+storm_max_surge <- storms_with_sccr_surge %>% 
+        group_by(storm, year) %>% 
+        summarize(max_surge = max(max_surge_reconstructed))
 
 
 ####################################
@@ -308,4 +348,9 @@ joined <- h_data %>%
 
 
 # write the final dataset
-write.csv(joined,file="data/StormHazards.csv")
+write.csv(joined,file="data/stormhazards.csv")
+data_old <- read.csv("data/stormhazards.csv")
+
+data_old %>% filter(name=="DANNY")
+storm_max_surge %>% filter(storm=="DANNY")
+
