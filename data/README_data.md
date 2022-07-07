@@ -22,7 +22,7 @@ contain only a single entry, but some contain multiple observations (e.g. Katrin
 only the maximum observed surge per storm. 
 
 The SURGEDAT database online seems to be incomplete, compared with the original SURGEDAT paper. We extract the 
-data directly from the SURGEDAT paper (Needham & Kein, 2012) using the `tabulizer` R package.
+data directly from the SURGEDAT paper (Needham & Kein, 2012) using the `tabulizer` R package. The `tabulizer` package requires Java in order to run. If Java is not on your machine, install Java at http://www.java.com.
 
 Another, possible more complete, source of storm surge data is found in the following paper: https://www.nature.com/articles/s41597-021-00906-x#Tab2. future versions of the dataset will likely be updated to use the 
 surge estimates described therein. 
