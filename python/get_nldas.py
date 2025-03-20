@@ -12,11 +12,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # hurdat_temp.csv is the file the rainfalls will be joined into. 
-# Users will have to create this file manually.
-# It should have a column called "precip" where the rainfalls 
+# This file is created (in the hurdat script) as a copy of the hurdat csv 
+# with an empty column, "precip", where the rainfalls 
 # will be populated. The code below will load the 
 # temp dataset and ignore rows with "precip" already populated, since
-# the data collection may take a while and/or fail at times.
+# the data collection may take a while and may fail if the 
+# connection is interrupted.
 
 hurdat = pd.read_csv("data/hurdat_temp.csv") 
 
@@ -100,10 +101,6 @@ for i in range(hurdat.shape[0]): #range(df.shape[0]):
            tot_rf = tot_rf + df.where(df['Rainf']>0)['Rainf'].sum()
 
     hurdat['precip'][i] = tot_rf
-    hurdat.to_csv("hurdat_temp.csv")
+    hurdat.to_csv("data/hurdat_temp.csv")
 
-
-
-# %%
-
-# %%
+hurdat.to_csv("data/landfalls_precip.csv")

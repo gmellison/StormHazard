@@ -1,29 +1,20 @@
+library(dplyr)
 library(arrow) 
 library(geslaR)
 library(cli)
 
-# you'll need to use the "geslaR" package to join the gesla storm surge data.
-# the below funtion, "download_gesla()", takes a while to run, but it'll 
-# set up the necessary files locally. 
-# Then the rest of the code will take a while, but it'll process and join the 
-# gesla data to the hurdat landfalls.
+# this script downloads and joins the gesla data to the hurdat data.
+# hurdat data should already be stored in the data subdir
 
-# download_gesla()
 hurdat <- read.csv("data/data_hurdat.csv")
+
+if (!file.exists("data/GESLA3_All.csv")) {
+    download_gesla()
+}
 gesla_meta <- read.csv("data/GESLA3_All.csv")
 
-# names(gesla_meta)
-#  [1] "FILE.NAME"                 "SITE.NAME"                 "SITE.CODE"                
-#  [4] "COUNTRY"                   "CONTRIBUTOR..ABBREVIATED." "CONTRIBUTOR..FULL."       
-#  [7] "CONTRIBUTOR.WEBSITE"       "CONTRIBUTOR.CONTACT"       "ORGINATOR"                
-# [10] "ORIGINATOR.WEBSITE"        "ORIGINATOR.CONTACT"        "LATITUDE"                 
-# [13] "LONGITUDE"                 "COORDINATE.SYSTEM"         "START.DATE.TIME"          
-# [16] "END.DATE.TIME"             "NUMBER.OF.YEARS"           "TIME.ZONE.HOURS"          
-# [19] "DATUM.INFORMATION"         "INSTRUMENT"                "PRECISION"                
-# [22] "NULL.VALUE"                "GAUGE.TYPE"                "OVERALL.RECORD.QUALITY"   
 
 i <- 1
-
 ges_sites <- lapply(1:nrow(hurdat), function(i) {
     d <- 1.5
     lat <- hurdat$lat[i]
@@ -66,18 +57,13 @@ max_surge_inR <- all_gesla_landfalls |>
         collect()
 
 max_surge <-  max_surge_inR %>%
-        left_join(avg_sl, by=c("country", "site_name", "year", "month")) %>% 
+        left_join(avg_sl, by=c("file_name", "country", "site_name", "year", "month")) %>% 
         mutate(daily_max_surge = max_sl - last10) %>%
-        select(-sl_l1, -sl_l2, -sl_l3, -sl_l4, -sl_l5, -sl_l6, -sl_l7, -sl_l8, -sl_l9, -sl_l10,)
-
+        select(-sl_l1, -sl_l2, -sl_l3, -sl_l4, -sl_l5, -sl_l6, -sl_l7, -sl_l8, -sl_l9, -sl_l10)
 
 landfall_max_surge <- ges_sites %>%
         left_join(max_surge, by=c("file_name", "year", "month", "day")) %>%
         filter(!is.na(daily_max_surge))
-
-head(landfall_max_surge[landfall_max_surge$year > 2013,])
-head(landfall_max_surge[landfall_max_surge$hurdat_row==6,])
-
 
 hurdat_surges <- landfall_max_surge %>%
         group_by(hurdat_row) %>%
@@ -86,4 +72,4 @@ hurdat_surges <- landfall_max_surge %>%
 hurdat$surge_gesla <- NA
 hurdat$surge_gesla[hurdat_surges$hurdat_row] <- hurdat_surges$max_surge
 
-tail(hurdat, 20)
+write.csv("data/landfalls_surge.csv")
