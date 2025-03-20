@@ -1,5 +1,6 @@
 library(dplyr)
 library(tidyr)
+library(ggplot2)
 
 data <- read.csv("data/landfalls_surge.csv")
 rf <- read.csv("data/landfalls_rain.csv")
@@ -39,22 +40,33 @@ data$tors_z <-  (data$tors - mean(data$tors, na.rm=TRUE))/sd(data$tors, na.rm=TR
 df <- data %>% select(h_name, h_id, date, 
                         "Wind"=windspeed_max, "Surge"=surge_gesla, "Rain"=precip_hr, "Tornado"=tors,
                         "WindZ"=wind_z, "SurgeZ"=surge_z, "RainZ"=rain_z, "TornadoZ"=tors_z)
-
-png("wind.png")
-hist(df$WindZ, xlab="Z-score", main="Windspeed")
+histran <- c(-2.2,6.2)
+png("plots/wind.png")
+hist(df$WindZ, xlab="Z-score", main="Windspeed", xlim=histran)
 dev.off()
 
-png("surge.png")
-hist(df$SurgeZ, xlab="Z-score", main="Storm Surge")
+png("plots/surge.png")
+hist(df$SurgeZ, xlab="Z-score", main="Storm Surge", xlim=histran)
 dev.off()
 
-png("rain.png")
-hist(df$RainZ, xlab="Z-score", main="Rainfall")
+png("plots/rain.png")
+hist(df$RainZ, xlab="Z-score", main="Rainfall", xlim=histran)
 dev.off()
 
-png("tors.png")
-hist(df$TornadoZ, xlab="Z-score", main="Tornado")
+png("plots/tors.png")
+hist(df$TornadoZ, xlab="Z-score", main="Tornado", xlim=histran)
 dev.off()
+
+png("plots/z_hists.png",w=960,h=720)
+par(mfrow=c(2,2))
+par(oma=c(2,2,1,1))
+par(mar=c(4,2.5,3,3), cex.main=1.5, cex.lab=1.5, cex.axis=1.5)
+hist(df$WindZ, xlab="Z-score", main="Windspeed", xlim=histran)
+hist(df$SurgeZ, xlab="Z-score", main="Storm Surge", xlim=histran)
+hist(df$RainZ, xlab="Z-score", main="Rainfall", xlim=histran)
+hist(df$TornadoZ, xlab="Z-score", main="Tornado", xlim=histran)
+dev.off()
+
 
 kat_row <- df[df$h_name == "KATRINA", ][4,]
 kat <- kat_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
@@ -62,9 +74,13 @@ kat$Hazard <- stringr::str_replace_all(kat$Hazard, "Z", "")
 ggplot(kat) + 
         geom_bar(aes(x=Hazard, 
                      y=value),
-        stat="identity") + 
-        labs(x="Hazard", y="Z-Score", title=sprintf("Katrina (%s)", kat$date))
-ggsave("katrina.png")
+                 col="black",
+                 fill="grey65",
+                 stat="identity") + 
+        labs(x="Hazard", y="Z-Score", title=sprintf("Katrina (%s)", kat$date)) + 
+        coord_cartesian(ylim=c(-1,4.5)) +
+        theme_minimal()
+ggsave("plots/katrina.png")
 
 charl_row <- df[df$h_name == "CHARLEY", ][4,]
 charl <- charl_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
@@ -72,29 +88,13 @@ charl$Hazard <- stringr::str_replace_all(charl$Hazard, "Z", "")
 ggplot(charl) + 
         geom_bar(aes(x=Hazard, 
                      y=value),
-        stat="identity") + 
-        labs(x="Hazard", y="Z-Score", title=sprintf("Charley (%s)", charl$date))
-ggsave("charley.png")
-
-jean_row <- df[df$h_name == "JEANNE", ][5,]
-jean <- jean_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
-jean$Hazard <- stringr::str_replace_all(jean$Hazard, "Z", "")
-ggplot(jean) + 
-        geom_bar(aes(x=Hazard, 
-                     y=value),
-        stat="identity") + 
-        labs(x="Hazard", y="Z-Score", title=sprintf("Jeanne (%s)", jean$date))
-ggsave("jeanne.png")
-
-harv_row <- df[df$h_name == "HARVEY", ][7,]
-harv <- harv_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
-harv$Hazard <- stringr::str_replace_all(harv$Hazard, "Z", "")
-ggplot(harv) + 
-        geom_bar(aes(x=Hazard, 
-                     y=value),
-        stat="identity") + 
-        labs(x="Hazard", y="Z-Score", title=sprintf("Harvey (%s)", harv$date))
-ggsave("harvey.png")
+                 col="black",
+                 fill="grey65",
+                 stat="identity") + 
+        labs(x="Hazard", y="Z-Score", title=sprintf("Charley (%s)", charl$date)) +
+        coord_cartesian(ylim=c(-1,4.5)) +
+        theme_minimal()
+ggsave("plots/charley.png")
 
 matt_row <- df[df$h_name == "MATTHEW",][7,]
 matt <- matt_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
@@ -102,9 +102,13 @@ matt$Hazard <- stringr::str_replace_all(matt$Hazard, "Z", "")
 ggplot(matt) + 
         geom_bar(aes(x=Hazard, 
                      y=value),
-        stat="identity") + 
-        labs(x="Hazard", y="Z-Score", title=sprintf("Matthew (%s)", matt$date))
-ggsave("matthew.png")
+                 fill="grey65",
+                 col="black",
+                 stat="identity") + 
+        labs(x="Hazard", y="Z-Score", title=sprintf("Matthew (%s)", matt$date)) +
+        coord_cartesian(ylim=c(-1,4.5)) +
+        theme_minimal()
+ggsave("plots/matthew.png")
 
 ike_row <- df[df$h_name == "IKE",][4,]
 ike <- ike_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
@@ -112,11 +116,47 @@ ike$Hazard <- stringr::str_replace_all(ike$Hazard, "Z", "")
 ggplot(ike) + 
         geom_bar(aes(x=Hazard, 
                      y=value),
-        stat="identity") + 
-        labs(x="Hazard", y="Z-Score", title=sprintf("Ike (%s)", ike$date))
-ggsave("ike.png")
+                 col="black",
+                 fill="grey65",
+                 stat="identity") + 
+        labs(x="Hazard", y="Z-Score", title=sprintf("Ike (%s)", ike$date)) +
+        coord_cartesian(ylim=c(-1,4.5)) +
+        theme_minimal()
+ggsave("plots/ike.png")
 
 tab <- rbind(kat_row, ike_row, matt_row, charl_row) %>%
         select(h_name, date, Rain, RainZ, Surge, SurgeZ, Tornado, TornadoZ, Wind, WindZ) %>%
-        write.csv("res.csv")
+        write.csv("data/manuscript_tab.csv")
 
+
+
+# not used
+#jean_row <- df[df$h_name == "JEANNE", ][5,]
+#jean <- jean_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
+#jean$Hazard <- stringr::str_replace_all(jean$Hazard, "Z", "")
+#ggplot(jean) + 
+#        geom_bar(aes(x=Hazard, 
+#                     y=value),
+#                 col="black",
+#                 fill="grey65",
+#                 stat="identity") + 
+#        labs(x="Hazard", y="Z-Score", title=sprintf("Jeanne (%s)", jean$date))
+#        coord_cartesian(ylim=c(-1,4.5)) +
+#        theme_minimal()
+#ggsave("plots/jeanne.png")
+#
+#harv_row <- df[df$h_name == "HARVEY", ][7,]
+#harv <- harv_row %>% pivot_longer(cols=c(WindZ, SurgeZ, RainZ, TornadoZ), names_to="Hazard")
+#harv$Hazard <- stringr::str_replace_all(harv$Hazard, "Z", "")
+#ggplot(harv) + 
+#        geom_bar(aes(x=Hazard, 
+#                     y=value),
+#                 col="black",
+#                 fill="grey65",
+#                 stat="identity") + 
+#        labs(x="Hazard", y="Z-Score", title=sprintf("Harvey (%s)", harv$date)) +
+#        coord_cartesian(ylim=c(-1,4.5)) +
+#        theme_minimal()
+#ggsave("plots/harvey.png")
+#
+#
